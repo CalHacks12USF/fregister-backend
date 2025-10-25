@@ -7,6 +7,7 @@ import { AuthModule } from './auth/auth.module';
 import { DbTestModule } from './db-test/db-test.module';
 import { MlConnectorModule } from './ml-connector/ml-connector.module';
 import { InventoryModule } from './inventory/inventory.module';
+import { MessageModule } from './message/message.module';
 
 @Module({
   imports: [
@@ -19,6 +20,7 @@ import { InventoryModule } from './inventory/inventory.module';
     DbTestModule,
     MlConnectorModule,
     InventoryModule,
+    MessageModule,
   ],
   controllers: [AppController],
   providers: [AppService],
