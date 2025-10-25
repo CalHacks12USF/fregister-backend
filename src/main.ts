@@ -31,6 +31,7 @@ async function bootstrap() {
     .addTag('auth')
     .addTag('ml-connector', 'ML service writes inventory data here')
     .addTag('inventory', 'Frontend reads inventory data from here')
+    .addTag('message', 'Chat threads and messages management')
     .addBearerAuth()
     .build();
   const document = SwaggerModule.createDocument(app, config);
