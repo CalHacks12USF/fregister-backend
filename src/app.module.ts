@@ -5,6 +5,8 @@ import { AppService } from './app.service';
 import { SupabaseModule } from './supabase/supabase.module';
 import { AuthModule } from './auth/auth.module';
 import { DbTestModule } from './db-test/db-test.module';
+import { MlConnectorModule } from './ml-connector/ml-connector.module';
+import { InventoryModule } from './inventory/inventory.module';
 
 @Module({
   imports: [
@@ -15,6 +17,8 @@ import { DbTestModule } from './db-test/db-test.module';
     SupabaseModule,
     AuthModule,
     DbTestModule,
+    MlConnectorModule,
+    InventoryModule,
   ],
   controllers: [AppController],
   providers: [AppService],
