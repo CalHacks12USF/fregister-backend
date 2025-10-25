@@ -6,25 +6,63 @@ import {
   Headers,
   UnauthorizedException,
 } from '@nestjs/common';
+import {
+  ApiTags,
+  ApiOperation,
+  ApiResponse,
+  ApiBearerAuth,
+  ApiHeader,
+} from '@nestjs/swagger';
 import { AuthService } from './auth.service';
-import { RefreshTokenDto } from './dto/create-auth.dto';
+import { RefreshTokenDto, AuthResponseDto } from './dto/create-auth.dto';
 
+@ApiTags('auth')
 @Controller('auth')
 export class AuthController {
   constructor(private readonly authService: AuthService) {}
 
   @Post('login')
+  @ApiOperation({ summary: 'Sign in with Google' })
+  @ApiHeader({
+    name: 'authorization',
+    description: 'Bearer token with Google ID token',
+    required: true,
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Successfully authenticated',
+    type: AuthResponseDto,
+  })
+  @ApiResponse({
+    status: 401,
+    description: 'Unauthorized - Invalid or missing token',
+  })
   async signInWithGoogle(@Headers('authorization') authorization: string) {
     const idToken = this.extractToken(authorization);
     return this.authService.signInWithGoogle({ idToken });
   }
 
   @Post('signout')
+  @ApiOperation({ summary: 'Sign out the current user' })
+  @ApiResponse({
+    status: 200,
+    description: 'Successfully signed out',
+  })
   async signOut() {
     return this.authService.signOut();
   }
 
   @Post('refresh')
+  @ApiOperation({ summary: 'Refresh access token' })
+  @ApiResponse({
+    status: 200,
+    description: 'Successfully refreshed token',
+    type: AuthResponseDto,
+  })
+  @ApiResponse({
+    status: 401,
+    description: 'Unauthorized - Invalid or missing refresh token',
+  })
   async refreshToken(@Body() refreshTokenDto: RefreshTokenDto) {
     if (!refreshTokenDto.refreshToken) {
       throw new UnauthorizedException('Refresh token is required');
@@ -33,6 +71,21 @@ export class AuthController {
   }
 
   @Get('me')
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Get current user information' })
+  @ApiHeader({
+    name: 'authorization',
+    description: 'Bearer token with access token',
+    required: true,
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Successfully retrieved user information',
+  })
+  @ApiResponse({
+    status: 401,
+    description: 'Unauthorized - Invalid or missing token',
+  })
   async getCurrentUser(@Headers('authorization') authorization: string) {
     const token = this.extractToken(authorization);
     return this.authService.getCurrentUser(token);
