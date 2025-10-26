@@ -1,4 +1,8 @@
-import { Injectable, UnauthorizedException } from '@nestjs/common';
+import {
+  Injectable,
+  UnauthorizedException,
+  NotFoundException,
+} from '@nestjs/common';
 import { SupabaseService } from '../supabase/supabase.service';
 import { GoogleAuthDto, AuthResponseDto } from './dto/create-auth.dto';
 import { UpdateUserProfileDto } from './dto/update-user-profile.dto';
@@ -197,6 +201,42 @@ export class AuthService {
         throw error;
       }
       throw new UnauthorizedException('Failed to update user profile');
+    }
+  }
+
+  async getUserProfileById(userId: string) {
+    try {
+      const { data, error } = await this.supabaseService
+        .from('user_profiles')
+        .select('*')
+        .eq('user_id', userId)
+        .single();
+
+      if (error) {
+        if (error.code === 'PGRST116') {
+          throw new NotFoundException(
+            `User profile not found for user ID: ${userId}`,
+          );
+        }
+        throw new Error(`Failed to retrieve user profile: ${error.message}`);
+      }
+
+      return {
+        id: data.id,
+        userId: data.user_id,
+        email: data.email,
+        name: data.name,
+        avatarUrl: data.avatar_url,
+        softPreferences: data.soft_preferences,
+        hardPreferences: data.hard_preferences,
+        createdAt: data.created_at,
+        updatedAt: data.updated_at,
+      };
+    } catch (error) {
+      if (error instanceof NotFoundException) {
+        throw error;
+      }
+      throw new Error('Failed to retrieve user profile');
     }
   }
 }

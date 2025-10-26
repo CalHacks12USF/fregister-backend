@@ -5,6 +5,7 @@ import {
   Get,
   Put,
   Headers,
+  Param,
   UnauthorizedException,
 } from '@nestjs/common';
 import {
@@ -115,6 +116,20 @@ export class AuthController {
   ) {
     const token = this.extractToken(authorization);
     return this.authService.updateUserProfile(token, updateUserProfileDto);
+  }
+
+  @Get('profile/:userId')
+  @ApiOperation({ summary: 'Get user profile by user ID (Google ID)' })
+  @ApiResponse({
+    status: 200,
+    description: 'Successfully retrieved user profile',
+  })
+  @ApiResponse({
+    status: 404,
+    description: 'User profile not found',
+  })
+  async getUserProfileById(@Param('userId') userId: string) {
+    return this.authService.getUserProfileById(userId);
   }
 
   private extractToken(authorization: string): string {
