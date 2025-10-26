@@ -138,7 +138,7 @@ export class MessageService {
 
   private generateTitleFromContent(content: string): string {
     // Generate a smart title from the message content
-    const maxLength = 60;
+    const maxLength = 30;
 
     // Remove extra whitespace and newlines
     const cleaned = content.trim().replace(/\s+/g, ' ');
