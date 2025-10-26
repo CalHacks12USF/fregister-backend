@@ -1,7 +1,11 @@
 import { Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { SupabaseService } from '../supabase/supabase.service';
 import { CreateThreadDto } from './dto/create-thread.dto';
-import { CreateMessageDto, UpdateMessageDto, CreateMessageWithThreadDto } from './dto/create-message.dto';
+import {
+  CreateMessageDto,
+  UpdateMessageDto,
+  MessageRole,
+} from './dto/create-message.dto';
 
 @Injectable()
 export class MessageService {
@@ -13,9 +17,18 @@ export class MessageService {
 
   async createThread(createThreadDto: CreateThreadDto) {
     try {
+      // Generate title from content
+      const title = this.generateTitleFromContent(createThreadDto.content);
+
+      // Prepare thread data with generated title
+      const threadData = {
+        title,
+        user_id: createThreadDto.user_id,
+      };
+
       const { data, error } = await this.supabaseService
         .from('threads')
-        .insert(createThreadDto)
+        .insert(threadData)
         .select()
         .single();
 
@@ -24,10 +37,15 @@ export class MessageService {
         throw new Error(`Failed to create thread: ${error.message}`);
       }
 
-      this.logger.log(`Created thread with ID: ${data.id}`);
+      this.logger.log(
+        `Created thread with ID: ${data.id} and title: "${title}"`,
+      );
       return {
         success: true,
-        data,
+        data: {
+          thread: data,
+          content: createThreadDto.content,
+        },
       };
     } catch (error) {
       this.logger.error('Error in createThread', error);
@@ -118,89 +136,27 @@ export class MessageService {
 
   // ==================== MESSAGE OPERATIONS ====================
 
-  async createMessageWithThread(createMessageWithThreadDto: CreateMessageWithThreadDto) {
-    try {
-      // Auto-generate title from message content if not provided
-      const autoTitle = createMessageWithThreadDto.thread_title || 
-        this.generateTitleFromContent(createMessageWithThreadDto.content);
-
-      // Step 1: Create a new thread
-      const threadDto: CreateThreadDto = {
-        title: autoTitle,
-        user_id: createMessageWithThreadDto.user_id,
-      };
-
-      const { data: threadData, error: threadError } = await this.supabaseService
-        .from('threads')
-        .insert(threadDto)
-        .select()
-        .single();
-
-      if (threadError) {
-        this.logger.error('Error creating thread', threadError);
-        throw new Error(`Failed to create thread: ${threadError.message}`);
-      }
-
-      this.logger.log(`Created thread with ID: ${threadData.id} and title: "${autoTitle}"`);
-
-      // Step 2: Create the first message in the thread
-      const messageDto: CreateMessageDto = {
-        thread_id: threadData.id,
-        role: createMessageWithThreadDto.role,
-        content: createMessageWithThreadDto.content,
-        user_id: createMessageWithThreadDto.user_id, // Pass user_id to message
-        metadata: createMessageWithThreadDto.metadata,
-      };
-
-      const { data: messageData, error: messageError } = await this.supabaseService
-        .from('messages')
-        .insert(messageDto)
-        .select()
-        .single();
-
-      if (messageError) {
-        // If message creation fails, we should ideally rollback the thread
-        // For now, log the error and throw
-        this.logger.error('Error creating message after thread creation', messageError);
-        throw new Error(`Failed to create message: ${messageError.message}`);
-      }
-
-      this.logger.log(`Created message with ID: ${messageData.id} in new thread: ${threadData.id}`);
-
-      return {
-        success: true,
-        data: {
-          thread: threadData,
-          message: messageData,
-        },
-      };
-    } catch (error) {
-      this.logger.error('Error in createMessageWithThread', error);
-      throw error;
-    }
-  }
-
   private generateTitleFromContent(content: string): string {
     // Generate a smart title from the message content
     const maxLength = 60;
-    
+
     // Remove extra whitespace and newlines
     const cleaned = content.trim().replace(/\s+/g, ' ');
-    
+
     // If content is short enough, use it as is
     if (cleaned.length <= maxLength) {
       return cleaned;
     }
-    
+
     // Otherwise, truncate at word boundary
     const truncated = cleaned.substring(0, maxLength);
     const lastSpaceIndex = truncated.lastIndexOf(' ');
-    
+
     // If there's a space, cut at the last complete word
     if (lastSpaceIndex > maxLength * 0.7) {
       return truncated.substring(0, lastSpaceIndex) + '...';
     }
-    
+
     // Otherwise just truncate with ellipsis
     return truncated + '...';
   }
@@ -210,7 +166,8 @@ export class MessageService {
       // Verify thread exists
       await this.getThread(createMessageDto.thread_id);
 
-      const { data, error } = await this.supabaseService
+      // Create the user message
+      const { data: userMessage, error } = await this.supabaseService
         .from('messages')
         .insert(createMessageDto)
         .select()
@@ -221,15 +178,80 @@ export class MessageService {
         throw new Error(`Failed to create message: ${error.message}`);
       }
 
-      this.logger.log(`Created message with ID: ${data.id} in thread: ${createMessageDto.thread_id}`);
+      this.logger.log(
+        `Created message with ID: ${userMessage.id} in thread: ${createMessageDto.thread_id}`,
+      );
+
+      // Wait 10 seconds before generating AI response to simulate processing
+      this.logger.log('Waiting 10 seconds before generating AI response...');
+      await this.delay(10000);
+
+      // Generate a mock AI response
+      const mockAiResponse = this.generateMockAiResponse(
+        createMessageDto.content,
+      );
+
+      // Create the AI response message
+      const aiMessageDto: CreateMessageDto = {
+        thread_id: createMessageDto.thread_id,
+        role: MessageRole.ASSISTANT,
+        content: mockAiResponse,
+        metadata: { mock: true, timestamp: new Date().toISOString() },
+      };
+
+      const { data: aiMessage, error: aiError } = await this.supabaseService
+        .from('messages')
+        .insert(aiMessageDto)
+        .select()
+        .single();
+
+      if (aiError) {
+        this.logger.error('Error creating AI response message', aiError);
+        // Still return the user message even if AI response fails
+        return {
+          success: true,
+          data: {
+            userMessage,
+            aiMessage: null,
+            error: 'Failed to create AI response',
+          },
+        };
+      }
+
+      this.logger.log(
+        `Created AI response with ID: ${aiMessage.id} in thread: ${createMessageDto.thread_id}`,
+      );
+
       return {
         success: true,
-        data,
+        data: {
+          userMessage,
+          aiMessage,
+        },
       };
     } catch (error) {
       this.logger.error('Error in createMessage', error);
       throw error;
     }
+  }
+
+  private delay(ms: number): Promise<void> {
+    return new Promise((resolve) => setTimeout(resolve, ms));
+  }
+
+  private generateMockAiResponse(userMessage: string): string {
+    // Generate a mock AI response based on the user message
+    const responses = [
+      `I received your message: "${userMessage}". This is a mock AI response. I can help you with that!`,
+      `That's an interesting question about "${userMessage}". Here's what I think... (This is a mock response)`,
+      `Based on your input "${userMessage}", here are some suggestions... (Mock AI response)`,
+      `I understand you're asking about "${userMessage}". Let me provide some insights... (Mock response)`,
+      `Great question! Regarding "${userMessage}", I'd recommend... (This is a simulated AI response)`,
+    ];
+
+    // Select a random response
+    const randomIndex = Math.floor(Math.random() * responses.length);
+    return responses[randomIndex];
   }
 
   async getMessage(messageId: string) {
@@ -258,7 +280,11 @@ export class MessageService {
     }
   }
 
-  async getMessagesByThread(threadId: string, limit: number = 100, offset: number = 0) {
+  async getMessagesByThread(
+    threadId: string,
+    limit: number = 100,
+    offset: number = 0,
+  ) {
     try {
       // Verify thread exists
       await this.getThread(threadId);
