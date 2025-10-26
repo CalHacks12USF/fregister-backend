@@ -8,6 +8,7 @@ import { DbTestModule } from './db-test/db-test.module';
 import { MlConnectorModule } from './ml-connector/ml-connector.module';
 import { InventoryModule } from './inventory/inventory.module';
 import { MessageModule } from './message/message.module';
+import { AiAgentModule } from './ai-agent/ai-agent.module';
 
 @Module({
   imports: [
@@ -21,6 +22,7 @@ import { MessageModule } from './message/message.module';
     MlConnectorModule,
     InventoryModule,
     MessageModule,
+    AiAgentModule,
   ],
   controllers: [AppController],
   providers: [AppService],

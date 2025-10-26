@@ -1,10 +1,11 @@
 import { Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { SupabaseService } from '../supabase/supabase.service';
+import { InventorySnapshot } from '../ml-connector/types/inventory-snapshot.type';
 
 @Injectable()
 export class InventoryService {
   private readonly logger = new Logger(InventoryService.name);
-  private latestInventoryCache: any = null;
+  private latestInventoryCache: InventorySnapshot | null = null;
   private cacheTimestamp: number = 0;
   private readonly CACHE_TTL_MS = 60000; // Cache for 60 seconds
 
@@ -14,7 +15,10 @@ export class InventoryService {
     try {
       // Check if cache is valid
       const now = Date.now();
-      if (this.latestInventoryCache && (now - this.cacheTimestamp) < this.CACHE_TTL_MS) {
+      if (
+        this.latestInventoryCache &&
+        now - this.cacheTimestamp < this.CACHE_TTL_MS
+      ) {
         this.logger.log('Returning cached latest inventory');
         return {
           success: true,
@@ -25,21 +29,32 @@ export class InventoryService {
 
       // Cache miss or expired - fetch from database
       this.logger.log('Cache miss - fetching latest inventory from database');
-      const { data, error } = await this.supabaseService
+      const result = await this.supabaseService
         .from('inventory_snapshots')
         .select('*')
         .order('timestamp', { ascending: false })
         .limit(1)
         .single();
 
-      if (error) {
-        if (error.code === 'PGRST116') {
+      if (result.error) {
+        if (result.error.code === 'PGRST116') {
           // No rows returned
           throw new NotFoundException('No inventory data found');
         }
-        this.logger.error('Error fetching latest inventory from Supabase', error);
-        throw new Error(`Failed to fetch latest inventory: ${error.message}`);
+        this.logger.error(
+          'Error fetching latest inventory from Supabase',
+          result.error,
+        );
+        throw new Error(
+          `Failed to fetch latest inventory: ${result.error.message}`,
+        );
       }
+
+      if (!result.data) {
+        throw new NotFoundException('No inventory data found');
+      }
+
+      const data = result.data as InventorySnapshot;
 
       // Update cache
       this.latestInventoryCache = data;
@@ -65,7 +80,10 @@ export class InventoryService {
         .range(offset, offset + limit - 1);
 
       if (error) {
-        this.logger.error('Error fetching inventory history from Supabase', error);
+        this.logger.error(
+          'Error fetching inventory history from Supabase',
+          error,
+        );
         throw new Error(`Failed to fetch inventory history: ${error.message}`);
       }
 
@@ -90,7 +108,7 @@ export class InventoryService {
   }
 
   // Method to update cache with new data
-  updateCache(data: any) {
+  updateCache(data: InventorySnapshot) {
     this.logger.log('Cache updated with new data');
     this.latestInventoryCache = data;
     this.cacheTimestamp = Date.now();

@@ -2,6 +2,7 @@ import { Injectable, Logger } from '@nestjs/common';
 import { SupabaseService } from '../supabase/supabase.service';
 import { InventoryService } from '../inventory/inventory.service';
 import { InventoryPayloadDto } from './dto/inventory-payload.dto';
+import { InventorySnapshot } from './types/inventory-snapshot.type';
 
 @Injectable()
 export class MlConnectorService {
@@ -15,7 +16,7 @@ export class MlConnectorService {
   async saveInventoryData(payload: InventoryPayloadDto) {
     try {
       // Insert the inventory snapshot
-      const { data, error } = await this.supabaseService
+      const result = await this.supabaseService
         .from('inventory_snapshots')
         .insert({
           timestamp: payload.timestamp,
@@ -25,19 +26,32 @@ export class MlConnectorService {
         .select()
         .single();
 
-      if (error) {
-        this.logger.error('Error saving inventory data to Supabase', error);
-        throw new Error(`Failed to save inventory data: ${error.message}`);
+      if (result.error) {
+        this.logger.error(
+          'Error saving inventory data to Supabase',
+          result.error,
+        );
+        throw new Error(
+          `Failed to save inventory data: ${result.error.message}`,
+        );
       }
 
-      this.logger.log(`Successfully saved inventory snapshot with ID: ${data.id}`);
-      
+      if (!result.data) {
+        throw new Error('Failed to save inventory data: No data returned');
+      }
+
+      const snapshot = result.data as InventorySnapshot;
+
+      this.logger.log(
+        `Successfully saved inventory snapshot with ID: ${snapshot.id}`,
+      );
+
       // Update cache in the inventory service with the latest data
-      this.inventoryService.updateCache(data);
+      this.inventoryService.updateCache(snapshot);
 
       return {
         success: true,
-        data,
+        data: snapshot,
         message: 'Inventory data saved successfully',
       };
     } catch (error) {

@@ -1,10 +1,5 @@
 import { Controller, Get, Query } from '@nestjs/common';
-import {
-  ApiTags,
-  ApiOperation,
-  ApiResponse,
-  ApiQuery,
-} from '@nestjs/swagger';
+import { ApiTags, ApiOperation, ApiResponse, ApiQuery } from '@nestjs/swagger';
 import { InventoryService } from './inventory.service';
 
 @ApiTags('inventory')
@@ -13,9 +8,10 @@ export class InventoryController {
   constructor(private readonly inventoryService: InventoryService) {}
 
   @Get('latest')
-  @ApiOperation({ 
+  @ApiOperation({
     summary: 'Get the most recent inventory snapshot',
-    description: 'Returns the latest inventory data. Uses in-memory caching for better performance (60s TTL)',
+    description:
+      'Returns the latest inventory data. Uses in-memory caching for better performance (60s TTL)',
   })
   @ApiResponse({
     status: 200,
@@ -51,9 +47,10 @@ export class InventoryController {
   }
 
   @Get('history')
-  @ApiOperation({ 
+  @ApiOperation({
     summary: 'Get historical inventory snapshots',
-    description: 'Returns paginated historical inventory data for analytics and reporting',
+    description:
+      'Returns paginated historical inventory data for analytics and reporting',
   })
   @ApiQuery({
     name: 'limit',
