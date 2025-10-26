@@ -213,8 +213,8 @@ export class MessageService {
           data: {
             userMessage,
             aiMessage: null,
-            error: 'Failed to create AI response',
           },
+          error: 'Failed to create AI response',
         };
       }
 

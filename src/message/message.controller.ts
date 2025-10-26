@@ -187,32 +187,58 @@ export class MessageController {
     status: 201,
     description: 'Message created successfully with AI response',
     schema: {
-      example: {
-        success: true,
-        data: {
-          userMessage: {
-            id: '987e6543-e21b-12d3-a456-426614174000',
-            thread_id: '123e4567-e89b-12d3-a456-426614174000',
-            role: 'user',
-            content: 'What recipes can I make with apples?',
-            user_id: 'user123',
-            metadata: null,
-            created_at: '2025-10-25T10:00:00Z',
-            updated_at: '2025-10-25T10:00:00Z',
-          },
-          aiMessage: {
-            id: '987e6543-e21b-12d3-a456-426614174001',
-            thread_id: '123e4567-e89b-12d3-a456-426614174000',
-            role: 'assistant',
-            content:
-              'I received your message: "What recipes can I make with apples?". This is a mock AI response. I can help you with that!',
-            user_id: null,
-            metadata: { mock: true, timestamp: '2025-10-25T10:00:05Z' },
-            created_at: '2025-10-25T10:00:05Z',
-            updated_at: '2025-10-25T10:00:05Z',
+      oneOf: [
+        {
+          description: 'Success - Both messages created',
+          example: {
+            success: true,
+            data: {
+              userMessage: {
+                id: '987e6543-e21b-12d3-a456-426614174000',
+                thread_id: '123e4567-e89b-12d3-a456-426614174000',
+                role: 'user',
+                content: 'What recipes can I make with apples?',
+                user_id: 'user123',
+                metadata: null,
+                created_at: '2025-10-25T10:00:00Z',
+                updated_at: '2025-10-25T10:00:00Z',
+              },
+              aiMessage: {
+                id: '987e6543-e21b-12d3-a456-426614174001',
+                thread_id: '123e4567-e89b-12d3-a456-426614174000',
+                role: 'assistant',
+                content:
+                  'I received your message: "What recipes can I make with apples?". This is a mock AI response. I can help you with that!',
+                user_id: null,
+                metadata: { mock: true, timestamp: '2025-10-25T10:00:05Z' },
+                created_at: '2025-10-25T10:00:05Z',
+                updated_at: '2025-10-25T10:00:05Z',
+              },
+            },
           },
         },
-      },
+        {
+          description:
+            'Partial success - User message created, AI response failed',
+          example: {
+            success: true,
+            data: {
+              userMessage: {
+                id: '987e6543-e21b-12d3-a456-426614174000',
+                thread_id: '123e4567-e89b-12d3-a456-426614174000',
+                role: 'user',
+                content: 'What recipes can I make with apples?',
+                user_id: 'user123',
+                metadata: null,
+                created_at: '2025-10-25T10:00:00Z',
+                updated_at: '2025-10-25T10:00:00Z',
+              },
+              aiMessage: null,
+            },
+            error: 'Failed to create AI response',
+          },
+        },
+      ],
     },
   })
   @ApiResponse({ status: 404, description: 'Thread not found' })
