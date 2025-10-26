@@ -31,12 +31,11 @@ export class AuthService {
       }
 
       // Check if user profile exists in database
-      const { data: existingProfile, error: profileError } =
-        await this.supabaseService
-          .from('user_profiles')
-          .select('id')
-          .eq('user_id', data.user.id)
-          .single();
+      const { error: profileError } = await this.supabaseService
+        .from('user_profiles')
+        .select('id')
+        .eq('user_id', data.user.id)
+        .single();
 
       let isNewUser = false;
 
@@ -165,7 +164,10 @@ export class AuthService {
       const userId = userData.user.id;
 
       // Update the user profile with preferences
-      const updateData: any = {};
+      const updateData: {
+        soft_preferences?: string;
+        hard_preferences?: string;
+      } = {};
       if (updateUserProfileDto.softPreferences !== undefined) {
         updateData.soft_preferences = updateUserProfileDto.softPreferences;
       }
@@ -173,18 +175,33 @@ export class AuthService {
         updateData.hard_preferences = updateUserProfileDto.hardPreferences;
       }
 
-      const { data, error } = await this.supabaseService
+      const result = await this.supabaseService
         .from('user_profiles')
         .update(updateData)
         .eq('user_id', userId)
         .select()
         .single();
 
-      if (error) {
+      if (result.error) {
         throw new UnauthorizedException(
-          `Failed to update user profile: ${error.message}`,
+          `Failed to update user profile: ${result.error.message}`,
         );
       }
+
+      if (!result.data) {
+        throw new UnauthorizedException('Failed to update user profile');
+      }
+
+      const data = result.data as {
+        id: string;
+        user_id: string;
+        email: string;
+        name: string;
+        avatar_url: string;
+        soft_preferences: string;
+        hard_preferences: string;
+        updated_at: string;
+      };
 
       return {
         id: data.id,
@@ -206,20 +223,40 @@ export class AuthService {
 
   async getUserProfileById(userId: string) {
     try {
-      const { data, error } = await this.supabaseService
+      const result = await this.supabaseService
         .from('user_profiles')
         .select('*')
         .eq('user_id', userId)
         .single();
 
-      if (error) {
-        if (error.code === 'PGRST116') {
+      if (result.error) {
+        if (result.error.code === 'PGRST116') {
           throw new NotFoundException(
             `User profile not found for user ID: ${userId}`,
           );
         }
-        throw new Error(`Failed to retrieve user profile: ${error.message}`);
+        throw new Error(
+          `Failed to retrieve user profile: ${result.error.message}`,
+        );
       }
+
+      if (!result.data) {
+        throw new NotFoundException(
+          `User profile not found for user ID: ${userId}`,
+        );
+      }
+
+      const data = result.data as {
+        id: string;
+        user_id: string;
+        email: string;
+        name: string;
+        avatar_url: string;
+        soft_preferences: string;
+        hard_preferences: string;
+        created_at: string;
+        updated_at: string;
+      };
 
       return {
         id: data.id,

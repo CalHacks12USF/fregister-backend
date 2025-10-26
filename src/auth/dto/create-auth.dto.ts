@@ -40,7 +40,7 @@ export class AuthResponseDto {
   refreshToken?: string;
 
   @ApiProperty({
-    description: 'Indicates if this is the user\'s first login',
+    description: "Indicates if this is the user's first login",
     example: true,
   })
   isNewUser: boolean;

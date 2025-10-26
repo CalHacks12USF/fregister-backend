@@ -1,10 +1,5 @@
 import { Controller, Post, Body, HttpCode, HttpStatus } from '@nestjs/common';
-import {
-  ApiTags,
-  ApiOperation,
-  ApiResponse,
-  ApiBody,
-} from '@nestjs/swagger';
+import { ApiTags, ApiOperation, ApiResponse, ApiBody } from '@nestjs/swagger';
 import { MlConnectorService } from './ml-connector.service';
 import { InventoryPayloadDto } from './dto/inventory-payload.dto';
 
@@ -15,9 +10,10 @@ export class MlConnectorController {
 
   @Post('inventory')
   @HttpCode(HttpStatus.CREATED)
-  @ApiOperation({ 
+  @ApiOperation({
     summary: 'Receive and store inventory data from ML service',
-    description: 'ML service sends inventory snapshots to this endpoint. Automatically updates the cache for fast reads.',
+    description:
+      'ML service sends inventory snapshots to this endpoint. Automatically updates the cache for fast reads.',
   })
   @ApiBody({ type: InventoryPayloadDto })
   @ApiResponse({

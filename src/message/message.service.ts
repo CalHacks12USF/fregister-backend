@@ -1,5 +1,6 @@
 import { Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { SupabaseService } from '../supabase/supabase.service';
+import { AiAgentService } from '../ai-agent/ai-agent.service';
 import { CreateThreadDto } from './dto/create-thread.dto';
 import {
   CreateMessageDto,
@@ -7,11 +8,32 @@ import {
   MessageRole,
 } from './dto/create-message.dto';
 
+export interface Thread {
+  id: string;
+  title: string;
+  user_id: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface Message {
+  id: string;
+  thread_id: string;
+  role: MessageRole;
+  content: string;
+  metadata?: Record<string, unknown>;
+  created_at: string;
+  updated_at: string;
+}
+
 @Injectable()
 export class MessageService {
   private readonly logger = new Logger(MessageService.name);
 
-  constructor(private readonly supabaseService: SupabaseService) {}
+  constructor(
+    private readonly supabaseService: SupabaseService,
+    private readonly aiAgentService: AiAgentService,
+  ) {}
 
   // ==================== THREAD OPERATIONS ====================
 
@@ -26,24 +48,36 @@ export class MessageService {
         user_id: createThreadDto.user_id,
       };
 
-      const { data, error } = await this.supabaseService
+      const result = await this.supabaseService
         .from('threads')
         .insert(threadData)
         .select()
         .single();
 
-      if (error) {
-        this.logger.error('Error creating thread', error);
-        throw new Error(`Failed to create thread: ${error.message}`);
+      if (result.error) {
+        this.logger.error('Error creating thread', result.error);
+        throw new Error(`Failed to create thread: ${result.error.message}`);
       }
 
+      if (!result.data) {
+        throw new Error('Failed to create thread: No data returned');
+      }
+
+      const thread = result.data as Thread;
+
       this.logger.log(
-        `Created thread with ID: ${data.id} and title: "${title}"`,
+        `Created thread with ID: ${thread.id} and title: "${title}"`,
       );
+
+      // Call AI agent to start processing and wait for response if user_id is provided
+      if (createThreadDto.user_id) {
+        await this.aiAgentService.startAgent(createThreadDto.user_id);
+      }
+
       return {
         success: true,
         data: {
-          thread: data,
+          thread,
           content: createThreadDto.content,
         },
       };
@@ -55,23 +89,27 @@ export class MessageService {
 
   async getThread(threadId: string) {
     try {
-      const { data, error } = await this.supabaseService
+      const result = await this.supabaseService
         .from('threads')
         .select('*')
         .eq('id', threadId)
         .single();
 
-      if (error) {
-        if (error.code === 'PGRST116') {
+      if (result.error) {
+        if (result.error.code === 'PGRST116') {
           throw new NotFoundException(`Thread with ID ${threadId} not found`);
         }
-        this.logger.error('Error fetching thread', error);
-        throw new Error(`Failed to fetch thread: ${error.message}`);
+        this.logger.error('Error fetching thread', result.error);
+        throw new Error(`Failed to fetch thread: ${result.error.message}`);
+      }
+
+      if (!result.data) {
+        throw new NotFoundException(`Thread with ID ${threadId} not found`);
       }
 
       return {
         success: true,
-        data,
+        data: result.data as Thread,
       };
     } catch (error) {
       this.logger.error('Error in getThread', error);
@@ -167,27 +205,35 @@ export class MessageService {
       await this.getThread(createMessageDto.thread_id);
 
       // Create the user message
-      const { data: userMessage, error } = await this.supabaseService
+      const result = await this.supabaseService
         .from('messages')
         .insert(createMessageDto)
         .select()
         .single();
 
-      if (error) {
-        this.logger.error('Error creating message', error);
-        throw new Error(`Failed to create message: ${error.message}`);
+      if (result.error) {
+        this.logger.error('Error creating message', result.error);
+        throw new Error(`Failed to create message: ${result.error.message}`);
       }
 
+      if (!result.data) {
+        throw new Error('Failed to create message: No data returned');
+      }
+
+      const userMessageTyped = result.data as Message;
+
       this.logger.log(
-        `Created message with ID: ${userMessage.id} in thread: ${createMessageDto.thread_id}`,
+        `Created message with ID: ${userMessageTyped.id} in thread: ${createMessageDto.thread_id}`,
       );
 
-      // Wait 10 seconds before generating AI response to simulate processing
-      this.logger.log('Waiting 10 seconds before generating AI response...');
-      await this.delay(10000);
+      // Get AI response from AI agent
+      if (!createMessageDto.user_id) {
+        throw new Error('user_id is required to get AI response');
+      }
 
-      // Generate a mock AI response
-      const mockAiResponse = this.generateMockAiResponse(
+      const aiResponseContent = await this.aiAgentService.askAgent(
+        createMessageDto.user_id,
+        createMessageDto.thread_id,
         createMessageDto.content,
       );
 
@@ -195,38 +241,53 @@ export class MessageService {
       const aiMessageDto: CreateMessageDto = {
         thread_id: createMessageDto.thread_id,
         role: MessageRole.ASSISTANT,
-        content: mockAiResponse,
-        metadata: { mock: true, timestamp: new Date().toISOString() },
+        content: aiResponseContent,
+        metadata: {
+          timestamp: new Date().toISOString(),
+        },
       };
 
-      const { data: aiMessage, error: aiError } = await this.supabaseService
+      const aiResult = await this.supabaseService
         .from('messages')
         .insert(aiMessageDto)
         .select()
         .single();
 
-      if (aiError) {
-        this.logger.error('Error creating AI response message', aiError);
+      if (aiResult.error) {
+        this.logger.error('Error creating AI response message', aiResult.error);
         // Still return the user message even if AI response fails
         return {
           success: true,
           data: {
-            userMessage,
+            userMessage: userMessageTyped,
             aiMessage: null,
           },
           error: 'Failed to create AI response',
         };
       }
 
+      if (!aiResult.data) {
+        return {
+          success: true,
+          data: {
+            userMessage: userMessageTyped,
+            aiMessage: null,
+          },
+          error: 'Failed to create AI response: No data returned',
+        };
+      }
+
+      const aiMessageTyped = aiResult.data as Message;
+
       this.logger.log(
-        `Created AI response with ID: ${aiMessage.id} in thread: ${createMessageDto.thread_id}`,
+        `Created AI response with ID: ${aiMessageTyped.id} in thread: ${createMessageDto.thread_id}`,
       );
 
       return {
         success: true,
         data: {
-          userMessage,
-          aiMessage,
+          userMessage: userMessageTyped,
+          aiMessage: aiMessageTyped,
         },
       };
     } catch (error) {
@@ -235,44 +296,29 @@ export class MessageService {
     }
   }
 
-  private delay(ms: number): Promise<void> {
-    return new Promise((resolve) => setTimeout(resolve, ms));
-  }
-
-  private generateMockAiResponse(userMessage: string): string {
-    // Generate a mock AI response based on the user message
-    const responses = [
-      `I received your message: "${userMessage}". This is a mock AI response. I can help you with that!`,
-      `That's an interesting question about "${userMessage}". Here's what I think... (This is a mock response)`,
-      `Based on your input "${userMessage}", here are some suggestions... (Mock AI response)`,
-      `I understand you're asking about "${userMessage}". Let me provide some insights... (Mock response)`,
-      `Great question! Regarding "${userMessage}", I'd recommend... (This is a simulated AI response)`,
-    ];
-
-    // Select a random response
-    const randomIndex = Math.floor(Math.random() * responses.length);
-    return responses[randomIndex];
-  }
-
   async getMessage(messageId: string) {
     try {
-      const { data, error } = await this.supabaseService
+      const result = await this.supabaseService
         .from('messages')
         .select('*')
         .eq('id', messageId)
         .single();
 
-      if (error) {
-        if (error.code === 'PGRST116') {
+      if (result.error) {
+        if (result.error.code === 'PGRST116') {
           throw new NotFoundException(`Message with ID ${messageId} not found`);
         }
-        this.logger.error('Error fetching message', error);
-        throw new Error(`Failed to fetch message: ${error.message}`);
+        this.logger.error('Error fetching message', result.error);
+        throw new Error(`Failed to fetch message: ${result.error.message}`);
+      }
+
+      if (!result.data) {
+        throw new NotFoundException(`Message with ID ${messageId} not found`);
       }
 
       return {
         success: true,
-        data,
+        data: result.data as Message,
       };
     } catch (error) {
       this.logger.error('Error in getMessage', error);
@@ -316,25 +362,29 @@ export class MessageService {
 
   async updateMessage(messageId: string, updateMessageDto: UpdateMessageDto) {
     try {
-      const { data, error } = await this.supabaseService
+      const result = await this.supabaseService
         .from('messages')
         .update(updateMessageDto)
         .eq('id', messageId)
         .select()
         .single();
 
-      if (error) {
-        if (error.code === 'PGRST116') {
+      if (result.error) {
+        if (result.error.code === 'PGRST116') {
           throw new NotFoundException(`Message with ID ${messageId} not found`);
         }
-        this.logger.error('Error updating message', error);
-        throw new Error(`Failed to update message: ${error.message}`);
+        this.logger.error('Error updating message', result.error);
+        throw new Error(`Failed to update message: ${result.error.message}`);
+      }
+
+      if (!result.data) {
+        throw new NotFoundException(`Message with ID ${messageId} not found`);
       }
 
       this.logger.log(`Updated message with ID: ${messageId}`);
       return {
         success: true,
-        data,
+        data: result.data as Message,
       };
     } catch (error) {
       this.logger.error('Error in updateMessage', error);

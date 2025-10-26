@@ -1,5 +1,11 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { IsArray, IsDateString, IsString, IsNumber, ValidateNested } from 'class-validator';
+import {
+  IsArray,
+  IsDateString,
+  IsString,
+  IsNumber,
+  ValidateNested,
+} from 'class-validator';
 import { Type } from 'class-transformer';
 
 export class InventoryItemDto {
