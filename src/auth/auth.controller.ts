@@ -3,6 +3,7 @@ import {
   Post,
   Body,
   Get,
+  Put,
   Headers,
   UnauthorizedException,
 } from '@nestjs/common';
@@ -15,6 +16,7 @@ import {
 } from '@nestjs/swagger';
 import { AuthService } from './auth.service';
 import { RefreshTokenDto, AuthResponseDto } from './dto/create-auth.dto';
+import { UpdateUserProfileDto } from './dto/update-user-profile.dto';
 
 @ApiTags('auth')
 @Controller('auth')
@@ -89,6 +91,30 @@ export class AuthController {
   async getCurrentUser(@Headers('authorization') authorization: string) {
     const token = this.extractToken(authorization);
     return this.authService.getCurrentUser(token);
+  }
+
+  @Put('profile')
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Update user profile preferences' })
+  @ApiHeader({
+    name: 'authorization',
+    description: 'Bearer token with access token',
+    required: true,
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Successfully updated user profile',
+  })
+  @ApiResponse({
+    status: 401,
+    description: 'Unauthorized - Invalid or missing token',
+  })
+  async updateUserProfile(
+    @Headers('authorization') authorization: string,
+    @Body() updateUserProfileDto: UpdateUserProfileDto,
+  ) {
+    const token = this.extractToken(authorization);
+    return this.authService.updateUserProfile(token, updateUserProfileDto);
   }
 
   private extractToken(authorization: string): string {
