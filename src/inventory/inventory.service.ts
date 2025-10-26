@@ -28,7 +28,7 @@ export class InventoryService {
       const { data, error } = await this.supabaseService
         .from('inventory_snapshots')
         .select('*')
-        .order('created_at', { ascending: false })
+        .order('timestamp', { ascending: false })
         .limit(1)
         .single();
 
