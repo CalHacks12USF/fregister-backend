@@ -71,7 +71,35 @@ export class MessageService {
 
       // Call AI agent to start processing and wait for response if user_id is provided
       if (createThreadDto.user_id) {
-        await this.aiAgentService.startAgent(createThreadDto.user_id);
+        try {
+          await this.aiAgentService.startAgent(createThreadDto.user_id);
+          this.logger.log(
+            `AI agent started successfully for user: ${createThreadDto.user_id}`,
+          );
+        } catch (error) {
+          const errorObj = error as Error & {
+            response?: unknown;
+            code?: string;
+          };
+          const errorDetails: Record<string, unknown> = {
+            error: errorObj.message,
+            stack: errorObj.stack,
+            userId: createThreadDto.user_id,
+            threadId: thread.id,
+            timestamp: new Date().toISOString(),
+          };
+          if (errorObj.response) {
+            errorDetails.response = errorObj.response;
+          }
+          if (errorObj.code) {
+            errorDetails.code = errorObj.code;
+          }
+          this.logger.error(
+            `Failed to start AI agent for user: ${createThreadDto.user_id}`,
+            errorDetails,
+          );
+          // Don't throw - allow thread creation to succeed even if AI agent fails
+        }
       }
 
       return {
@@ -231,11 +259,42 @@ export class MessageService {
         throw new Error('user_id is required to get AI response');
       }
 
-      const aiResponseContent = await this.aiAgentService.askAgent(
-        createMessageDto.user_id,
-        createMessageDto.thread_id,
-        createMessageDto.content,
-      );
+      let aiResponseContent: string;
+      try {
+        aiResponseContent = await this.aiAgentService.askAgent(
+          createMessageDto.user_id,
+          createMessageDto.thread_id,
+          createMessageDto.content,
+        );
+        this.logger.log(
+          `AI agent response received successfully for thread: ${createMessageDto.thread_id}`,
+        );
+      } catch (error) {
+        const errorObj = error as Error & {
+          response?: unknown;
+          code?: string;
+        };
+        const errorDetails: Record<string, unknown> = {
+          error: errorObj.message,
+          stack: errorObj.stack,
+          userId: createMessageDto.user_id,
+          threadId: createMessageDto.thread_id,
+          userMessageContent: createMessageDto.content,
+          timestamp: new Date().toISOString(),
+        };
+        if (errorObj.response) {
+          errorDetails.response = errorObj.response;
+        }
+        if (errorObj.code) {
+          errorDetails.code = errorObj.code;
+        }
+        this.logger.error(
+          `Failed to get AI agent response for thread: ${createMessageDto.thread_id}`,
+          errorDetails,
+        );
+        // Re-throw to maintain existing error handling behavior
+        throw error;
+      }
 
       // Create the AI response message
       const aiMessageDto: CreateMessageDto = {
