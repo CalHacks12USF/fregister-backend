@@ -20,7 +20,7 @@ import {
 } from '@nestjs/swagger';
 import { MessageService } from './message.service';
 import { CreateThreadDto } from './dto/create-thread.dto';
-import { CreateMessageDto, UpdateMessageDto, CreateMessageWithThreadDto } from './dto/create-message.dto';
+import { CreateMessageDto, UpdateMessageDto } from './dto/create-message.dto';
 
 @ApiTags('message')
 @Controller('message')
@@ -31,8 +31,23 @@ export class MessageController {
 
   @Post('threads')
   @HttpCode(HttpStatus.CREATED)
-  @ApiOperation({ summary: 'Create a new conversation thread' })
-  @ApiBody({ type: CreateThreadDto })
+  @ApiOperation({
+    summary: 'Create a new conversation thread',
+    description:
+      'Creates a new thread. The thread title is auto-generated from the content field.',
+  })
+  @ApiBody({
+    type: CreateThreadDto,
+    examples: {
+      example1: {
+        summary: 'Create thread',
+        value: {
+          user_id: 'user123',
+          content: 'What recipes can I make with apples and yogurt?',
+        },
+      },
+    },
+  })
   @ApiResponse({
     status: 201,
     description: 'Thread created successfully',
@@ -40,11 +55,14 @@ export class MessageController {
       example: {
         success: true,
         data: {
-          id: '123e4567-e89b-12d3-a456-426614174000',
-          title: 'Recipe suggestions for dinner',
-          user_id: 'user123',
-          created_at: '2025-10-25T10:00:00Z',
-          updated_at: '2025-10-25T10:00:00Z',
+          thread: {
+            id: '123e4567-e89b-12d3-a456-426614174000',
+            title: 'What recipes can I make with apples and yogurt?',
+            user_id: 'user123',
+            created_at: '2025-10-25T10:00:00Z',
+            updated_at: '2025-10-25T10:00:00Z',
+          },
+          content: 'What recipes can I make with apples and yogurt?',
         },
       },
     },
@@ -135,7 +153,7 @@ export class MessageController {
 
   @Delete('threads/:threadId')
   @HttpCode(HttpStatus.OK)
-  @ApiOperation({ 
+  @ApiOperation({
     summary: 'Delete a thread and all its messages',
     description: 'Deletes the thread and all associated messages (CASCADE)',
   })
@@ -157,70 +175,70 @@ export class MessageController {
 
   // ==================== MESSAGE ENDPOINTS ====================
 
-  @Post('start')
-  @HttpCode(HttpStatus.CREATED)
-  @ApiOperation({ 
-    summary: 'Start a new conversation (creates thread + first message)',
-    description: '🚀 Perfect for starting a new chat! Automatically creates a thread and adds the first message in one call. Thread title is auto-generated from message content if not provided.',
-  })
-  @ApiBody({ type: CreateMessageWithThreadDto })
-  @ApiResponse({
-    status: 201,
-    description: 'Thread and message created successfully',
-    schema: {
-      example: {
-        success: true,
-        data: {
-          thread: {
-            id: '123e4567-e89b-12d3-a456-426614174000',
-            title: 'What recipes can I make with apples and yogurt?',
-            user_id: 'user123',
-            created_at: '2025-10-25T10:00:00Z',
-            updated_at: '2025-10-25T10:00:00Z',
-          },
-          message: {
-            id: '987e6543-e21b-12d3-a456-426614174000',
-            thread_id: '123e4567-e89b-12d3-a456-426614174000',
-            role: 'user',
-            content: 'What recipes can I make with apples and yogurt?',
-            user_id: 'user123',
-            metadata: null,
-            created_at: '2025-10-25T10:00:00Z',
-            updated_at: '2025-10-25T10:00:00Z',
-          },
-        },
-      },
-    },
-  })
-  @ApiResponse({ status: 500, description: 'Internal server error' })
-  async startConversation(@Body() createMessageWithThreadDto: CreateMessageWithThreadDto) {
-    return this.messageService.createMessageWithThread(createMessageWithThreadDto);
-  }
-
   @Post('messages')
   @HttpCode(HttpStatus.CREATED)
-  @ApiOperation({ 
-    summary: 'Create a new message in a thread',
-    description: 'Creates a message from user, assistant, or system',
+  @ApiOperation({
+    summary: 'Create a new message in a thread and get AI response',
+    description:
+      'Creates a user message in the thread and automatically generates a mock AI response',
   })
   @ApiBody({ type: CreateMessageDto })
   @ApiResponse({
     status: 201,
-    description: 'Message created successfully',
+    description: 'Message created successfully with AI response',
     schema: {
-      example: {
-        success: true,
-        data: {
-          id: '987e6543-e21b-12d3-a456-426614174000',
-          thread_id: '123e4567-e89b-12d3-a456-426614174000',
-          role: 'user',
-          content: 'What recipes can I make with apples?',
-          user_id: 'user123',
-          metadata: null,
-          created_at: '2025-10-25T10:00:00Z',
-          updated_at: '2025-10-25T10:00:00Z',
+      oneOf: [
+        {
+          description: 'Success - Both messages created',
+          example: {
+            success: true,
+            data: {
+              userMessage: {
+                id: '987e6543-e21b-12d3-a456-426614174000',
+                thread_id: '123e4567-e89b-12d3-a456-426614174000',
+                role: 'user',
+                content: 'What recipes can I make with apples?',
+                user_id: 'user123',
+                metadata: null,
+                created_at: '2025-10-25T10:00:00Z',
+                updated_at: '2025-10-25T10:00:00Z',
+              },
+              aiMessage: {
+                id: '987e6543-e21b-12d3-a456-426614174001',
+                thread_id: '123e4567-e89b-12d3-a456-426614174000',
+                role: 'assistant',
+                content:
+                  'I received your message: "What recipes can I make with apples?". This is a mock AI response. I can help you with that!',
+                user_id: null,
+                metadata: { mock: true, timestamp: '2025-10-25T10:00:05Z' },
+                created_at: '2025-10-25T10:00:05Z',
+                updated_at: '2025-10-25T10:00:05Z',
+              },
+            },
+          },
         },
-      },
+        {
+          description:
+            'Partial success - User message created, AI response failed',
+          example: {
+            success: true,
+            data: {
+              userMessage: {
+                id: '987e6543-e21b-12d3-a456-426614174000',
+                thread_id: '123e4567-e89b-12d3-a456-426614174000',
+                role: 'user',
+                content: 'What recipes can I make with apples?',
+                user_id: 'user123',
+                metadata: null,
+                created_at: '2025-10-25T10:00:00Z',
+                updated_at: '2025-10-25T10:00:00Z',
+              },
+              aiMessage: null,
+            },
+            error: 'Failed to create AI response',
+          },
+        },
+      ],
     },
   })
   @ApiResponse({ status: 404, description: 'Thread not found' })
@@ -289,7 +307,11 @@ export class MessageController {
   ) {
     const parsedLimit = Math.min(limit || 100, 500);
     const parsedOffset = offset || 0;
-    return this.messageService.getMessagesByThread(threadId, parsedLimit, parsedOffset);
+    return this.messageService.getMessagesByThread(
+      threadId,
+      parsedLimit,
+      parsedOffset,
+    );
   }
 
   @Get('messages/:messageId')

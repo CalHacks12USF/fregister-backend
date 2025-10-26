@@ -1,5 +1,11 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { IsString, IsEnum, IsUUID, IsOptional, IsObject } from 'class-validator';
+import {
+  IsString,
+  IsEnum,
+  IsUUID,
+  IsOptional,
+  IsObject,
+} from 'class-validator';
 
 export enum MessageRole {
   USER = 'user',
@@ -40,7 +46,8 @@ export class CreateMessageDto {
   user_id?: string;
 
   @ApiProperty({
-    description: 'Optional metadata for the message (e.g., tokens used, model info)',
+    description:
+      'Optional metadata for the message (e.g., tokens used, model info)',
     example: { model: 'gpt-4', tokens: 150 },
     required: false,
   })
@@ -84,7 +91,8 @@ export class CreateMessageWithThreadDto {
   user_id?: string;
 
   @ApiProperty({
-    description: 'Optional metadata for the message (e.g., tokens used, model info)',
+    description:
+      'Optional metadata for the message (e.g., tokens used, model info)',
     example: { model: 'gpt-4', tokens: 150 },
     required: false,
   })
