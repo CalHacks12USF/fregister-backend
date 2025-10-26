@@ -18,6 +18,7 @@ import {
 import { AuthService } from './auth.service';
 import { RefreshTokenDto, AuthResponseDto } from './dto/create-auth.dto';
 import { UpdateUserProfileDto } from './dto/update-user-profile.dto';
+import { UserProfileResponseDto } from './dto/user-profile-response.dto';
 
 @ApiTags('auth')
 @Controller('auth')
@@ -105,6 +106,7 @@ export class AuthController {
   @ApiResponse({
     status: 200,
     description: 'Successfully updated user profile',
+    type: UserProfileResponseDto,
   })
   @ApiResponse({
     status: 401,
@@ -123,6 +125,7 @@ export class AuthController {
   @ApiResponse({
     status: 200,
     description: 'Successfully retrieved user profile',
+    type: UserProfileResponseDto,
   })
   @ApiResponse({
     status: 404,
