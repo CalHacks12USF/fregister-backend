@@ -17,7 +17,8 @@ async function bootstrap() {
 
   // Enable CORS
   app.enableCors({
-    origin: 'http://localhost:3000', // Frontend URL
+    // Allow both local development and the production Vercel frontend
+    origin: ['http://localhost:3000', 'https://fregister-frontend.vercel.app'],
     credentials: true,
     methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'Authorization'],
